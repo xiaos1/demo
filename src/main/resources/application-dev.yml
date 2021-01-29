@@ -1,0 +1,15 @@
+server:
+  port: 8099
+  servlet:
+    context-path: /demo
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/batchdb?characterEncoding=utf8&useSSL=true&serverTimezone=Hongkong
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+nutz:
+  dao:
+    runtime:
+      create: false #自动创建表
+      migration: false #根据bena自动更新表结构
