@@ -3,10 +3,11 @@ package com.example.demo.dao.impl;
 import com.example.demo.dao.CollectDao;
 import com.example.demo.entity.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.nutz.dao.Cnd;
 import org.nutz.dao.Dao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:41 AM
@@ -19,7 +20,7 @@ public class CollectDaoImpl implements CollectDao {
     Dao dao;
 
     @Override
-    public Resource fetchResource() {
-        return dao.fetch(Resource.class, Cnd.where("id", "=", 1));
+    public List<Resource> fetchResource() {
+        return dao.query(Resource.class, null);
     }
 }

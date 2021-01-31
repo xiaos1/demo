@@ -35,50 +35,51 @@ public class CollectServiceImpl implements CollectService {
     OkHttpClient client = new OkHttpClient();
 
     @Override
-    public double[] getSummary() throws IOException {
+    public double[] getSummary() {
         double beCpu = 0.0d, normalCpu = 0.0d, stableCpu = 0.0d;
-        Resource resource = collectDao.fetchResource();
-        String cluster = resource.getClusterName();
-        String phy = resource.getPhysicalQueue();
-        String resourceTypes = resource.getResourceTypes();
-        boolean isQianXun = resource.isQianXun();
+        List<Resource> resources = collectDao.fetchResource();
+        for (Resource r : resources) {
+            String cluster = r.getClusterName();
+            String phy = r.getPhysicalQueue();
+            String resourceTypes = r.getResourceTypes();
+            boolean isQianXun = r.isQianXun();
 //        Request request = new Request.Builder()
 //                .get()
 //                .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/scheduler_" + phy + ".json")
 //                .build();
-        try {
-            Request request = new Request.Builder()
-                    .get()
-                    .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
-                    .build();
-            Call call = client.newCall(request);
-            Response response = call.execute();
-            String res = Objects.requireNonNull(response.body()).string();
-            JSONObject obj = JSON.parseObject(res);
-            List<String> queues = new ArrayList<>();
-            for (int i = 2; i < obj.size(); i++) {
-                JSONObject o = obj.getJSONObject(i + 1 + "");
-                String queueName = o.getString("name");
-                queues.add(queueName);
-                double cpu = o.getDouble("CPU");
-                if (isQianXun) {
-                    if (resourceTypes.contains("be")) {
-                        stableCpu += cpu;
+            try {
+                Request request = new Request.Builder()
+                        .get()
+                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
+                        .build();
+                Call call = client.newCall(request);
+                Response response = call.execute();
+                String res = Objects.requireNonNull(response.body()).string();
+                JSONObject obj = JSON.parseObject(res);
+                List<String> queues = new ArrayList<>();
+                for (int i = 2; i < obj.size(); i++) {
+                    JSONObject o = obj.getJSONObject(i + 1 + "");
+                    String queueName = o.getString("name");
+                    queues.add(queueName);
+                    double cpu = o.getDouble("CPU");
+                    if (isQianXun) {
+                        if (resourceTypes.contains("be")) {
+                            stableCpu += cpu;
+                        }
+                        if (resourceTypes.contains("stable")) {
+                            beCpu += cpu;
+                        }
+                    } else {
+                        if (resourceTypes.contains("be")) {
+                            beCpu += cpu;
+                        }
+                        if (resourceTypes.contains("stable")) {
+                            stableCpu += cpu;
+                        }
                     }
-                    if (resourceTypes.contains("stable")) {
-                        beCpu += cpu;
+                    if (resourceTypes.contains("normal")) {
+                        normalCpu += cpu;
                     }
-                } else {
-                    if (resourceTypes.contains("be")) {
-                        beCpu += cpu;
-                    }
-                    if (resourceTypes.contains("stable")) {
-                        stableCpu += cpu;
-                    }
-                }
-                if (resourceTypes.contains("normal")) {
-                    normalCpu += cpu;
-                }
 //            Request req = new Request.Builder()
 //                    .get()
 //                    .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/tracker?action=queue&queue=" + queueName + "&physical="+phy)
@@ -88,10 +89,11 @@ public class CollectServiceImpl implements CollectService {
 //                long cpu = Long.parseLong(JSON.parseObject(o.toString()).getString("staticCpuMemDisk").split("/")[0]);
 //                summary += cpu;
 //            }
-            }
-            log.info("{} {} queue counted done", queues.toString(), queues.size());
-        } catch (Exception ignored) {
+                }
+                log.info("{} {} queue counted done", queues.toString(), queues.size());
+            } catch (Exception ignored) {
 
+            }
         }
         return new double[]{beCpu, normalCpu, stableCpu};
     }

@@ -13,7 +13,7 @@ import java.util.*;
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/28 4:37 PM
  */
-@RequestMapping(value = "/algo-system")
+@RequestMapping(value = "/stats")
 @RestController
 public class DemoController {
 
