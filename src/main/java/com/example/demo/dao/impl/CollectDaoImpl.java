@@ -1,8 +1,9 @@
 package com.example.demo.dao.impl;
 
 import com.example.demo.dao.CollectDao;
-import com.example.demo.entity.Resource;
+import com.example.demo.entity.PhyResource;
 import lombok.extern.slf4j.Slf4j;
+import org.nutz.dao.Cnd;
 import org.nutz.dao.Dao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -20,7 +21,7 @@ public class CollectDaoImpl implements CollectDao {
     Dao dao;
 
     @Override
-    public List<Resource> fetchResource() {
-        return dao.query(Resource.class, null);
+    public List<PhyResource> fetchResource() {
+        return dao.query(PhyResource.class, Cnd.where("is_deleted", "=", 1));
     }
 }

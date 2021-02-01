@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.*;
 
@@ -15,15 +16,16 @@ import java.util.*;
  */
 @RequestMapping(value = "/stats")
 @RestController
-public class DemoController {
+public class DemoController extends BaseCtrl {
 
     @Autowired
     CollectService collectService;
 
     @ResponseBody
     @RequestMapping(value = "/reload", method = RequestMethod.GET, produces = "application/json")
-    public String reload() throws IOException {
-        double[] summary = collectService.getSummary();
-        return "[BE, batch, stable] = " + Arrays.toString(summary);
+    public void reload(HttpServletResponse response) throws IOException {
+        Map<String, Object> ret = new HashMap<>();
+        ret.put("cpu", collectService.getSummary());
+        responseJson(response, 0, "success", ret);
     }
 }

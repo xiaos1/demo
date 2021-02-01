@@ -3,7 +3,7 @@ package com.example.demo.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.example.demo.dao.CollectDao;
-import com.example.demo.entity.Resource;
+import com.example.demo.entity.PhyResource;
 import com.example.demo.service.CollectService;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Call;
@@ -15,10 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:40 AM
@@ -35,13 +32,13 @@ public class CollectServiceImpl implements CollectService {
     OkHttpClient client = new OkHttpClient();
 
     @Override
-    public double[] getSummary() {
+    public Map<String, Double> getSummary() {
         double beCpu = 0.0d, normalCpu = 0.0d, stableCpu = 0.0d;
-        List<Resource> resources = collectDao.fetchResource();
-        for (Resource r : resources) {
+        List<PhyResource> resources = collectDao.fetchResource();
+        for (PhyResource r : resources) {
             String cluster = r.getClusterName();
             String phy = r.getPhysicalQueue();
-            String resourceTypes = r.getResourceTypes();
+            String port = r.getPort();
             boolean isQianXun = r.isQianXun();
 //        Request request = new Request.Builder()
 //                .get()
@@ -50,35 +47,35 @@ public class CollectServiceImpl implements CollectService {
             try {
                 Request request = new Request.Builder()
                         .get()
-                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
+                        .url("http://" + cluster + "-normandy.dmop.baidu.com:" + port + "/filetree?action=cat&path=/" + phy + "-resource.json")
                         .build();
                 Call call = client.newCall(request);
                 Response response = call.execute();
                 String res = Objects.requireNonNull(response.body()).string();
                 JSONObject obj = JSON.parseObject(res);
                 List<String> queues = new ArrayList<>();
-                for (int i = 2; i < obj.size(); i++) {
-                    JSONObject o = obj.getJSONObject(i + 1 + "");
+                for (String key : obj.keySet()) {
+                    JSONObject o = obj.getJSONObject(key);
+                    if (!o.getString("type").equals("LOGICAL")) {
+                        continue;
+                    }
                     String queueName = o.getString("name");
                     queues.add(queueName);
                     double cpu = o.getDouble("CPU");
                     if (isQianXun) {
-                        if (resourceTypes.contains("be")) {
-                            stableCpu += cpu;
+                        if (o.getString("resource.priority").equals("UNSTABLE")) {
+                            normalCpu += cpu;
                         }
-                        if (resourceTypes.contains("stable")) {
+                        if (o.getString("resource.priority").equals("STABLE")) {
                             beCpu += cpu;
                         }
                     } else {
-                        if (resourceTypes.contains("be")) {
+                        if (o.getString("resource.priority").equals("UNSTABLE")) {
                             beCpu += cpu;
                         }
-                        if (resourceTypes.contains("stable")) {
+                        if (o.getString("resource.priority").equals("STABLE")) {
                             stableCpu += cpu;
                         }
-                    }
-                    if (resourceTypes.contains("normal")) {
-                        normalCpu += cpu;
                     }
 //            Request req = new Request.Builder()
 //                    .get()
@@ -92,9 +89,14 @@ public class CollectServiceImpl implements CollectService {
                 }
                 log.info("{} {} queue counted done", queues.toString(), queues.size());
             } catch (Exception ignored) {
-
+                log.debug("ops, the http request was wrong!");
             }
         }
-        return new double[]{beCpu, normalCpu, stableCpu};
+        Map<String, Double> ret = new HashMap<>();
+        ret.put("BE", beCpu);
+        ret.put("normal", normalCpu);
+        ret.put("stable", stableCpu);
+        return ret;
     }
 }
+

@@ -14,11 +14,13 @@ import org.nutz.dao.entity.annotation.Table;
 @Getter
 @Setter
 @Table("t_global_cluster_quota")
-public class Resource {
+public class PhyResource {
     @Id
     private long id;
     @Column("cluster_name")
     private String clusterName;
+    @Column("port")
+    private String port;
     @Column("resource_types")
     private String resourceTypes;
     @Column("physical_queue")
