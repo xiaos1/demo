@@ -25,7 +25,7 @@ public class DemoController extends BaseCtrl {
     @RequestMapping(value = "/reload", method = RequestMethod.GET, produces = "application/json")
     public void reload(HttpServletResponse response) throws IOException {
         Map<String, Object> ret = new HashMap<>();
-        ret.put("cpu", collectService.getSummary());
+        ret.put("cpu", collectService.doGetData());
         responseJson(response, 0, "success", ret);
     }
 }

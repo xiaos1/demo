@@ -1,6 +1,10 @@
 package com.example.demo.service;
 
+import com.example.demo.bean.ResourceClassification;
+import com.example.demo.bean.ReturningData;
+
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -8,5 +12,9 @@ import java.util.Map;
  */
 public interface CollectService {
 
-    Map<String, Double> getSummary() throws IOException;
+    Map<String, ResourceClassification> doCollectData() throws IOException;
+
+    List<ReturningData> doGetData();
+
+    void doRecordData();
 }

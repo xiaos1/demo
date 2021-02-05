@@ -2,7 +2,10 @@ package com.example.demo.service.impl;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.example.demo.bean.ResourceClassification;
+import com.example.demo.bean.ReturningData;
 import com.example.demo.dao.CollectDao;
+import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
 import com.example.demo.service.CollectService;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +23,6 @@ import java.util.*;
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:40 AM
  */
-@Slf4j
 @Service
 public class CollectServiceImpl implements CollectService {
 
@@ -32,22 +34,33 @@ public class CollectServiceImpl implements CollectService {
     OkHttpClient client = new OkHttpClient();
 
     @Override
-    public Map<String, Double> getSummary() {
+    public Map<String, ResourceClassification> doCollectData() {
         double beCpu = 0.0d, normalCpu = 0.0d, stableCpu = 0.0d;
+        String defaultResourcePriority = "STABLE";
         List<PhyResource> resources = collectDao.fetchResource();
+        Map<String, ResourceClassification> platformResourceMap = new HashMap<>();
+        Map<String, Double> cpuResourceMap;
         for (PhyResource r : resources) {
             String cluster = r.getClusterName();
             String phy = r.getPhysicalQueue();
-            String port = r.getPort();
+            String platform = r.getPlatform();
+            if (!platformResourceMap.containsKey(platform)) {
+                cpuResourceMap = new HashMap<>();
+                cpuResourceMap.put("normal", normalCpu);
+                cpuResourceMap.put("be", beCpu);
+                cpuResourceMap.put("stable", stableCpu);
+                platformResourceMap.putIfAbsent(platform, new ResourceClassification(cpuResourceMap));
+            }
             boolean isQianXun = r.isQianXun();
 //        Request request = new Request.Builder()
 //                .get()
 //                .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/scheduler_" + phy + ".json")
 //                .build();
+            Request request = null;
             try {
-                Request request = new Request.Builder()
+                request = new Request.Builder()
                         .get()
-                        .url("http://" + cluster + "-normandy.dmop.baidu.com:" + port + "/filetree?action=cat&path=/" + phy + "-resource.json")
+                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
                         .build();
                 Call call = client.newCall(request);
                 Response response = call.execute();
@@ -62,21 +75,27 @@ public class CollectServiceImpl implements CollectService {
                     String queueName = o.getString("name");
                     queues.add(queueName);
                     double cpu = o.getDouble("CPU");
+                    if (!o.containsKey("resource.priority") || !o.getString("resource.priority").equals("UNSTABLE")) {
+                        o.put("resource.priority", defaultResourcePriority);
+                    }
                     if (isQianXun) {
                         if (o.getString("resource.priority").equals("UNSTABLE")) {
-                            normalCpu += cpu;
+                            normalCpu = platformResourceMap.get(platform).getCpuResourceMap().get("normal") + cpu;
                         }
                         if (o.getString("resource.priority").equals("STABLE")) {
-                            beCpu += cpu;
+                            beCpu = platformResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
                         }
                     } else {
                         if (o.getString("resource.priority").equals("UNSTABLE")) {
-                            beCpu += cpu;
+                            beCpu = platformResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
                         }
                         if (o.getString("resource.priority").equals("STABLE")) {
-                            stableCpu += cpu;
+                            stableCpu = platformResourceMap.get(platform).getCpuResourceMap().get("stable") + cpu;
                         }
                     }
+                    platformResourceMap.get(platform).getCpuResourceMap().put("normal", normalCpu);
+                    platformResourceMap.get(platform).getCpuResourceMap().put("be", beCpu);
+                    platformResourceMap.get(platform).getCpuResourceMap().put("stable", stableCpu);
 //            Request req = new Request.Builder()
 //                    .get()
 //                    .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/tracker?action=queue&queue=" + queueName + "&physical="+phy)
@@ -88,15 +107,33 @@ public class CollectServiceImpl implements CollectService {
 //            }
                 }
                 log.info("{} {} queue counted done", queues.toString(), queues.size());
-            } catch (Exception ignored) {
-                log.debug("ops, the http request was wrong!");
+            } catch (Exception e) {
+                log.error("ops, the http request {} was wrong!", request == null ? null : request.url().toString());
             }
         }
         Map<String, Double> ret = new HashMap<>();
         ret.put("BE", beCpu);
         ret.put("normal", normalCpu);
         ret.put("stable", stableCpu);
-        return ret;
+        return platformResourceMap;
+    }
+
+    @Override
+    public void doRecordData() {
+        List<CpuStats> list = new ArrayList<>();
+        Map<String, ResourceClassification> rcMap = doCollectData();
+        for (String s : rcMap.keySet()) {
+            Map<String, Double> dMap = rcMap.get(s).getCpuResourceMap();
+            for (String ss : dMap.keySet()) {
+                list.add(new CpuStats(dMap.get(ss), ss, s));
+            }
+        }
+        collectDao.insertCpuStats(list);
+    }
+
+    @Override
+    public List<ReturningData> doGetData() {
+        return collectDao.queryCpuStats();
     }
 }
 

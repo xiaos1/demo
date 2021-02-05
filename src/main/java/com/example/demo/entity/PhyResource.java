@@ -21,8 +21,8 @@ public class PhyResource {
     private String clusterName;
     @Column("port")
     private String port;
-    @Column("resource_types")
-    private String resourceTypes;
+    @Column("platform")
+    private String platform;
     @Column("physical_queue")
     private String physicalQueue;
     @Column("is_qianxun")
