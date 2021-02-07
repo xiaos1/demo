@@ -19,8 +19,8 @@ public class SchedulerService {
     @Autowired
     CollectService collectService;
 
-//    @Scheduled(zone = "Asia/Shanghai",cron = "0 40 3 * * ?")
-    @Scheduled(zone = "Asia/Shanghai",cron = "*/5 * * * * ?")
+    @Scheduled(zone = "Asia/Shanghai",cron = "0 40 3 * * ?")
+//    @Scheduled(zone = "Asia/Shanghai",cron = "*/5 * * * * ?")
     public void doStats(){
         log.warn("scheduler coming");
         collectService.doRecordData();

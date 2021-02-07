@@ -5,7 +5,6 @@ import com.example.demo.dao.CollectDao;
 import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
 import lombok.extern.slf4j.Slf4j;
-import org.nutz.dao.Cnd;
 import org.nutz.dao.Dao;
 import org.nutz.dao.Sqls;
 import org.nutz.dao.sql.Sql;
@@ -29,7 +28,7 @@ public class CollectDaoImpl implements CollectDao {
 
     @Override
     public List<PhyResource> fetchResource() {
-        return dao.query(PhyResource.class, Cnd.where("is_deleted", "=", 1));
+        return dao.query(PhyResource.class, null);
     }
 
     @Override
