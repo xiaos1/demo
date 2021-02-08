@@ -8,7 +8,6 @@ import com.example.demo.dao.CollectDao;
 import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
 import com.example.demo.service.CollectService;
-import lombok.extern.slf4j.Slf4j;
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -35,37 +34,58 @@ public class CollectServiceImpl implements CollectService {
 
     @Override
     public Map<String, ResourceClassification> doCollectData() {
-        double beCpu = 0.0d, normalCpu = 0.0d, stableCpu = 0.0d;
+        double pBeCpu, pNormalCpu, pStableCpu;
+        double ridBeCpu, ridNormalCpu, ridStableCpu;
+        double tBeCpu = 0.0d, tNormalCpu = 0.0d, tStableCpu = 0.0d;
+        double bufferBeCpu = 0.0d, bufferNormalCpu = 0.0d, bufferStableCpu = 0.0d;
         String defaultResourcePriority = "STABLE";
+        String defaultResourceAccountId = "";
         List<PhyResource> resources = collectDao.fetchResource();
-        Map<String, ResourceClassification> platformResourceMap = new HashMap<>();
-        Map<String, Double> cpuResourceMap;
+        Map<String, ResourceClassification> anykeyResourceMap = new HashMap<>();
+        Map<String, Double> bufferCpuResourceMap = new HashMap<>();
+        bufferCpuResourceMap.put("normal", 0d);
+        bufferCpuResourceMap.put("be", 0d);
+        bufferCpuResourceMap.put("stable", 0d);
+        Map<String, Double> totalCpuResourceMap = new HashMap<>();
+        totalCpuResourceMap.put("normal", 0d);
+        totalCpuResourceMap.put("be", 0d);
+        totalCpuResourceMap.put("stable", 0d);
+        anykeyResourceMap.putIfAbsent("EMRBUFFER", new ResourceClassification(bufferCpuResourceMap));
+        anykeyResourceMap.putIfAbsent("TOTAL", new ResourceClassification(totalCpuResourceMap));
         for (PhyResource r : resources) {
             String cluster = r.getClusterName();
             String phy = r.getPhysicalQueue();
             String platform = r.getPlatform();
-            if (!platformResourceMap.containsKey(platform)) {
-                cpuResourceMap = new HashMap<>();
-                cpuResourceMap.put("normal", normalCpu);
-                cpuResourceMap.put("be", beCpu);
-                cpuResourceMap.put("stable", stableCpu);
-                platformResourceMap.putIfAbsent(platform, new ResourceClassification(cpuResourceMap));
+            if (!anykeyResourceMap.containsKey(platform)) {
+                Map<String, Double> cpuResourceMap = new HashMap<>();
+                cpuResourceMap.put("normal", 0d);
+                cpuResourceMap.put("be", 0d);
+                cpuResourceMap.put("stable", 0d);
+                anykeyResourceMap.putIfAbsent(platform, new ResourceClassification(cpuResourceMap));
             }
             boolean isQianXun = r.isQianXun();
+            boolean unknown = r.isUnknown();
 //        Request request = new Request.Builder()
 //                .get()
 //                .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/scheduler_" + phy + ".json")
 //                .build();
             Request request = null;
             try {
-                request = new Request.Builder()
-                        .get()
-                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
-                        .build();
+                if (!platform.equals("STREAM")) {
+                    request = new Request.Builder()
+                            .get()
+                            .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
+                            .build();
+                } else {
+                    request = new Request.Builder()
+                            .get()
+                            .url("http://" + cluster + ".dmop.baidu.com:8025/filetree?action=cat&path=/" + phy + "-resource.json")
+                            .build();
+                }
                 Call call = client.newCall(request);
                 Response response = call.execute();
                 String res = Objects.requireNonNull(response.body()).string();
-                JSONObject obj = JSON.parseObject(res);
+                JSONObject obj = JSON.parseObject(res);//queue obj list under a physical queue
                 List<String> queues = new ArrayList<>();
                 for (String key : obj.keySet()) {
                     JSONObject o = obj.getJSONObject(key);
@@ -78,24 +98,74 @@ public class CollectServiceImpl implements CollectService {
                     if (!o.containsKey("resource.priority") || !o.getString("resource.priority").equals("UNSTABLE")) {
                         o.put("resource.priority", defaultResourcePriority);
                     }
-                    if (isQianXun) {
-                        if (o.getString("resource.priority").equals("UNSTABLE")) {
-                            normalCpu = platformResourceMap.get(platform).getCpuResourceMap().get("normal") + cpu;
-                        }
-                        if (o.getString("resource.priority").equals("STABLE")) {
-                            beCpu = platformResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
-                        }
+                    if (!o.containsKey("resource.account.id")) {
+                        o.put("resource.account.id", defaultResourceAccountId);
+                    }
+                    String rid = o.getString("resource.account.id");
+                    if (!anykeyResourceMap.containsKey(rid)) {
+                        Map<String, Double> ridCpuResourceMap = new HashMap<>();
+                        ridCpuResourceMap.put("normal", 0d);
+                        ridCpuResourceMap.put("be", 0d);
+                        ridCpuResourceMap.put("stable", 0d);
+                        anykeyResourceMap.putIfAbsent(rid, new ResourceClassification(ridCpuResourceMap));
+                    }
+                    if (o.getString("name").contains("buffer") && o.getString("name").contains("_emr_")
+                            && o.getString("name").contains("_preempt-standard_")) {
+                        bufferBeCpu += cpu;
+                        tBeCpu += cpu;
+                        log.warn("EMRBUFFER - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+                    } else if (o.getString("name").contains("buffer") && o.getString("name").contains("_emr_")
+                            && o.getString("name").contains("_preempt-high_")) {
+                        bufferNormalCpu += cpu;
+                        tNormalCpu += cpu;
+                        log.warn("EMRBUFFER - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                    } else if (o.getString("name").contains("buffer") && o.getString("name").contains("_emr_")
+                            && o.getString("name").contains("_standard_")) {
+                        bufferStableCpu += cpu;
+                        tStableCpu += cpu;
+                        log.warn("EMRBUFFER - cluster name: {}, physical queue: {}, logical queue: {}, stable quota: {}", cluster, phy, o.getString("name"), cpu);
                     } else {
-                        if (o.getString("resource.priority").equals("UNSTABLE")) {
-                            beCpu = platformResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
+                        if (unknown) {
+                            isQianXun = false;
                         }
-                        if (o.getString("resource.priority").equals("STABLE")) {
-                            stableCpu = platformResourceMap.get(platform).getCpuResourceMap().get("stable") + cpu;
+                        if (isQianXun) {
+                            if (o.getString("resource.priority").equals("UNSTABLE")) {
+                                ridNormalCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("normal") + cpu;
+                                anykeyResourceMap.get(rid).getCpuResourceMap().put("normal", ridNormalCpu);
+                                log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                                pNormalCpu = anykeyResourceMap.get(platform).getCpuResourceMap().get("normal") + cpu;
+                                anykeyResourceMap.get(platform).getCpuResourceMap().put("normal", pNormalCpu);
+
+                                tNormalCpu += cpu;
+                            } else if (o.getString("resource.priority").equals("STABLE")) {
+                                ridBeCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("be") + cpu;
+                                anykeyResourceMap.get(rid).getCpuResourceMap().put("be", ridBeCpu);
+                                log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+                                pBeCpu = anykeyResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
+                                anykeyResourceMap.get(platform).getCpuResourceMap().put("be", pBeCpu);
+
+                                tBeCpu += cpu;
+                            }
+                        } else {
+                            if (o.getString("resource.priority").equals("UNSTABLE")) {
+                                ridBeCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("be") + cpu;
+                                anykeyResourceMap.get(rid).getCpuResourceMap().put("be", ridBeCpu);
+                                log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+                                pBeCpu = anykeyResourceMap.get(platform).getCpuResourceMap().get("be") + cpu;
+                                anykeyResourceMap.get(platform).getCpuResourceMap().put("be", pBeCpu);
+
+                                tBeCpu += cpu;
+                            } else if (o.getString("resource.priority").equals("STABLE")) {
+                                ridStableCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("stable") + cpu;
+                                anykeyResourceMap.get(rid).getCpuResourceMap().put("stable", ridStableCpu);
+                                log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, stable quota: {}", cluster, phy, o.getString("name"), cpu);
+                                pStableCpu = anykeyResourceMap.get(platform).getCpuResourceMap().get("stable") + cpu;
+                                anykeyResourceMap.get(platform).getCpuResourceMap().put("stable", pStableCpu);
+
+                                tStableCpu += cpu;
+                            }
                         }
                     }
-                    platformResourceMap.get(platform).getCpuResourceMap().put("normal", normalCpu);
-                    platformResourceMap.get(platform).getCpuResourceMap().put("be", beCpu);
-                    platformResourceMap.get(platform).getCpuResourceMap().put("stable", stableCpu);
 //            Request req = new Request.Builder()
 //                    .get()
 //                    .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/tracker?action=queue&queue=" + queueName + "&physical="+phy)
@@ -106,17 +176,26 @@ public class CollectServiceImpl implements CollectService {
 //                summary += cpu;
 //            }
                 }
-                log.info("{} {} queue counted done", queues.toString(), queues.size());
+//                log.info("{} {} queue counted done", queues.toString(), queues.size());
             } catch (Exception e) {
                 log.error("ops, the http request {} was wrong!", request == null ? null : request.url().toString());
             }
         }
-        Map<String, Double> ret = new HashMap<>();
-        ret.put("BE", beCpu);
-        ret.put("normal", normalCpu);
-        ret.put("stable", stableCpu);
-        return platformResourceMap;
+        anykeyResourceMap.get("TOTAL").getCpuResourceMap().put("stable", tStableCpu);
+        anykeyResourceMap.get("TOTAL").getCpuResourceMap().put("be", tBeCpu);
+        anykeyResourceMap.get("TOTAL").getCpuResourceMap().put("normal", tNormalCpu);
+        anykeyResourceMap.get("EMRBUFFER").getCpuResourceMap().put("be", bufferBeCpu);
+        anykeyResourceMap.get("EMRBUFFER").getCpuResourceMap().put("normal", bufferNormalCpu);
+        anykeyResourceMap.get("EMRBUFFER").getCpuResourceMap().put("stable", bufferStableCpu);
+        return anykeyResourceMap;
     }
+
+    static Map<String, String> ridPlatformMap = new HashMap<String, String>() {{
+        put("5486b59407d6484ca0815893e589194b", "EMR+ (buffer excluded)");
+        put("b7f0ca8bed474aa792fd7d5a9c0b2309", "BVC");
+        put("a06acc9457a54f7789c4ebf9019e2fed", "ADU");
+        put("aa60e652ea7f404ab6474da26d6dcb30", "batch-test");
+    }};
 
     @Override
     public void doRecordData() {
@@ -125,7 +204,11 @@ public class CollectServiceImpl implements CollectService {
         for (String s : rcMap.keySet()) {
             Map<String, Double> dMap = rcMap.get(s).getCpuResourceMap();
             for (String ss : dMap.keySet()) {
-                list.add(new CpuStats(dMap.get(ss), ss, s));
+                if (s.equals("STREAM") || s.equals("MPI") || s.equals("EMRBUFFER") || s.equals("TOTAL")) {
+                    list.add(new CpuStats(dMap.get(ss), ss, s));
+                } else if (!s.equals("ADU") && !s.equals("EMR") && !s.equals("BVC") && !s.equals("COMPASS") && !s.equals("OTHER")) {
+                    list.add(new CpuStats(dMap.get(ss), ss, ridPlatformMap.getOrDefault(s, "")));
+                }
             }
         }
         collectDao.insertCpuStats(list);
@@ -134,6 +217,14 @@ public class CollectServiceImpl implements CollectService {
     @Override
     public List<ReturningData> doGetData() {
         return collectDao.queryCpuStats();
+    }
+
+    public static void main(String[] args) {
+        int a = 1;
+        int b = 2;
+        int c = 0;
+        c += a + b;
+        System.out.println(c);
     }
 }
 

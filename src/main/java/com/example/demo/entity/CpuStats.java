@@ -30,6 +30,8 @@ public class CpuStats {
     private String resourceType;
     @Column("platform")
     private String platform;
+    @Column("rid")
+    private String rid = "";
     @Column("date")
     private String date;
     @Column("create_time")
@@ -48,7 +50,7 @@ public class CpuStats {
     public String getDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd");
         Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, -1);
+        calendar.add(Calendar.DATE, 0);
         Date date = calendar.getTime();
         return sdf.format(date);
     }

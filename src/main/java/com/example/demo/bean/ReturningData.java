@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 public class ReturningData {
     private double total;
     private String resourceType;
+    private String rid;
     private String platform;
     private String date;
 }

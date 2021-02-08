@@ -12,9 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:41 AM
@@ -28,7 +26,11 @@ public class CollectDaoImpl implements CollectDao {
 
     @Override
     public List<PhyResource> fetchResource() {
-        return dao.query(PhyResource.class, null);
+        Sql sql = Sqls.create("select distinct cluster_name, physical_queue, platform, is_qianxun  from t_global_cluster_quota_resource");
+        sql.setCallback(Sqls.callback.entities());
+        sql.setEntity(dao.getEntity(PhyResource.class));
+        dao.execute(sql);
+        return sql.getList(PhyResource.class);
     }
 
     @Override
@@ -38,13 +40,13 @@ public class CollectDaoImpl implements CollectDao {
 
     @Override
     public List<ReturningData> queryCpuStats() {
-        Sql sql = Sqls.create("select cpu as total, resource_type, platform , date from t_cpu_stats");
+        Sql sql = Sqls.create("select cpu as total, resource_type, rid, platform, date from t_cpu_stats");
         sql.setCallback((connection, rs, sql1) -> {
-            Map<String, List<ReturningData>> daily_sale_map = new HashMap<>();
             List<ReturningData> list1 = new ArrayList<>();
             while (null != rs && rs.next()) {
                 ReturningData returningData = new ReturningData();
                 returningData.setTotal(rs.getDouble("total"));
+                returningData.setRid(rs.getString("rid"));
                 returningData.setPlatform(rs.getString("platform"));
                 returningData.setResourceType(rs.getString("resource_type"));
                 returningData.setDate(rs.getString("date"));
