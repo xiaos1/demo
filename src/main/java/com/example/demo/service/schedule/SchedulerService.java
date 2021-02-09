@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import java.util.Map;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/2/3 2:59 PM
@@ -21,10 +22,10 @@ public class SchedulerService {
     @Autowired
     CollectService collectService;
 
-    @Scheduled(zone = "Asia/Shanghai",cron = "0 40 3 * * ?")
+    @Scheduled(zone = "Asia/Shanghai", cron = "0 40 3 * * ?")
 //    @Scheduled(zone = "Asia/Shanghai",cron = "* */20 * * * ?")
 //    @PostConstruct
-    public void doStats(){
+    public void doStats() {
         log.warn("scheduler coming");
         collectService.doRecordData();
     }

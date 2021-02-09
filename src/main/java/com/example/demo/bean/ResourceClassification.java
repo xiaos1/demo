@@ -15,11 +15,17 @@ import java.util.Map;
 public class ResourceClassification {
 
     Map<String, Double> cpuResourceMap;
-    Map<String, Double> memResourceMap;
+    Map<String, Double> gMemResourceMap;
     Map<String, Double> gpuResourceMap;
 
     public ResourceClassification(Map<String, Double> cpuResourceMap) {
         this.cpuResourceMap = cpuResourceMap;
+    }
+
+    public ResourceClassification(Map<String, Double> cpuResourceMap, Map<String, Double> gMemResourceMap, Map<String, Double> gpuResourceMap) {
+        this.cpuResourceMap = cpuResourceMap;
+        this.gMemResourceMap = gMemResourceMap;
+        this.gpuResourceMap = gpuResourceMap;
     }
 
 }

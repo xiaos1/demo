@@ -3,6 +3,7 @@ package com.example.demo.dao;
 import com.example.demo.bean.ReturningData;
 import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
+import com.example.demo.entity.UserQueue;
 
 import java.util.List;
 
@@ -11,6 +12,8 @@ import java.util.List;
  */
 public interface CollectDao {
     List<PhyResource> fetchResource();
+
+    List<UserQueue> fetchQueue();
 
     void insertCpuStats(List<CpuStats> cpuStats);
 

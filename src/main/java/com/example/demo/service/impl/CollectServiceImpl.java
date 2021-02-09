@@ -1,12 +1,14 @@
 package com.example.demo.service.impl;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.example.demo.bean.ResourceClassification;
 import com.example.demo.bean.ReturningData;
 import com.example.demo.dao.CollectDao;
 import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
+import com.example.demo.entity.UserQueue;
 import com.example.demo.service.CollectService;
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
@@ -16,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 
@@ -38,6 +41,7 @@ public class CollectServiceImpl implements CollectService {
         double ridBeCpu, ridNormalCpu, ridStableCpu;
         double tBeCpu = 0.0d, tNormalCpu = 0.0d, tStableCpu = 0.0d;
         double bufferBeCpu = 0.0d, bufferNormalCpu = 0.0d, bufferStableCpu = 0.0d;
+        double stableQuota = 0.0d;
         String defaultResourcePriority = "STABLE";
         String defaultResourceAccountId = "";
         List<PhyResource> resources = collectDao.fetchResource();
@@ -52,6 +56,12 @@ public class CollectServiceImpl implements CollectService {
         totalCpuResourceMap.put("stable", 0d);
         anykeyResourceMap.putIfAbsent("EMRBUFFER", new ResourceClassification(bufferCpuResourceMap));
         anykeyResourceMap.putIfAbsent("TOTAL", new ResourceClassification(totalCpuResourceMap));
+        Map<String, Double> mpiCpuResourceMap = new HashMap<>();
+        mpiCpuResourceMap.put("normal", 0d);
+        mpiCpuResourceMap.put("be", 0d);
+        mpiCpuResourceMap.put("stable", 0d);
+        anykeyResourceMap.putIfAbsent("MPI", new ResourceClassification(mpiCpuResourceMap));
+        Map<String, String> map = fetchQueue();
         for (PhyResource r : resources) {
             String cluster = r.getClusterName();
             String phy = r.getPhysicalQueue();
@@ -71,7 +81,19 @@ public class CollectServiceImpl implements CollectService {
 //                .build();
             Request request = null;
             try {
-                if (!platform.equals("STREAM")) {
+                if ("MPI".equals(platform)) {
+                    request = new Request.Builder()
+                            .get()
+                            .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/tracker?action=physical&physical=" + phy)
+                            .build();
+                    Call call = client.newCall(request);
+                    Response response = call.execute();
+                    String res = Objects.requireNonNull(response.body()).string();
+                    JSONArray obj = JSON.parseObject(res).getJSONArray("physicals");//queue obj list under a physical queue
+                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[1]);
+                    anykeyResourceMap.get("MPI").getCpuResourceMap().put("stable", stableQuota);
+                    continue;
+                } else if (!platform.equals("STREAM")) {
                     request = new Request.Builder()
                             .get()
                             .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
@@ -109,6 +131,9 @@ public class CollectServiceImpl implements CollectService {
                         ridCpuResourceMap.put("stable", 0d);
                         anykeyResourceMap.putIfAbsent(rid, new ResourceClassification(ridCpuResourceMap));
                     }
+                    if (!StringUtils.isEmpty(rid)) {
+                        log.info("resource.account.id: {}", rid);
+                    }
                     if (o.getString("name").contains("buffer") && o.getString("name").contains("_emr_")
                             && o.getString("name").contains("_preempt-standard_")) {
                         bufferBeCpu += cpu;
@@ -128,7 +153,34 @@ public class CollectServiceImpl implements CollectService {
                         if (unknown) {
                             isQianXun = false;
                         }
-                        if (isQianXun) {
+                        if ("EMR+ (buffer excluded)".equals(ridPlatformMap.get(rid))) {
+                            String k = o.getString("name").toLowerCase() + " " + cluster.toLowerCase() + " " + phy.toLowerCase();
+                            if (map.containsKey(k)) {
+                                if ("stable".equals(map.get(k))) {
+                                    ridStableCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("stable") + cpu;
+                                    anykeyResourceMap.get(rid).getCpuResourceMap().put("stable", ridStableCpu);
+                                    log.info("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, stable quota: {}", cluster, phy, o.getString("name"), cpu);
+
+                                    tStableCpu += cpu;
+                                } else if ("be".equals(map.get(k))) {
+                                    ridBeCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("be") + cpu;
+                                    anykeyResourceMap.get(rid).getCpuResourceMap().put("be", ridBeCpu);
+                                    log.info("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+
+                                    tBeCpu += cpu;
+                                } else if ("normal".equals(map.get(k))) {
+                                    ridNormalCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("normal") + cpu;
+                                    anykeyResourceMap.get(rid).getCpuResourceMap().put("normal", ridNormalCpu);
+                                    log.info("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+
+                                    tNormalCpu += cpu;
+                                } else {
+                                    log.error("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                                }
+                            } else {
+                                log.error("NOT EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                            }
+                        } else if (isQianXun) {
                             if (o.getString("resource.priority").equals("UNSTABLE")) {
                                 ridNormalCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("normal") + cpu;
                                 anykeyResourceMap.get(rid).getCpuResourceMap().put("normal", ridNormalCpu);
@@ -199,6 +251,7 @@ public class CollectServiceImpl implements CollectService {
 
     @Override
     public void doRecordData() {
+        Double bvcStable = 0.0d;
         List<CpuStats> list = new ArrayList<>();
         Map<String, ResourceClassification> rcMap = doCollectData();
         for (String s : rcMap.keySet()) {
@@ -207,10 +260,17 @@ public class CollectServiceImpl implements CollectService {
                 if (s.equals("STREAM") || s.equals("MPI") || s.equals("EMRBUFFER") || s.equals("TOTAL")) {
                     list.add(new CpuStats(dMap.get(ss), ss, s));
                 } else if (!s.equals("ADU") && !s.equals("EMR") && !s.equals("BVC") && !s.equals("COMPASS") && !s.equals("OTHER")) {
-                    list.add(new CpuStats(dMap.get(ss), ss, ridPlatformMap.getOrDefault(s, "")));
+                    if ("BVC".equals(ridPlatformMap.get(s))) {
+                        bvcStable += dMap.get(ss);
+                    } else {
+                        list.add(new CpuStats(dMap.get(ss), ss, ridPlatformMap.getOrDefault(s, "")));
+                    }
                 }
             }
         }
+        list.add(new CpuStats(bvcStable, "stable", "BVC"));
+        list.add(new CpuStats(0.0d, "normal", "BVC"));
+        list.add(new CpuStats(0.0d, "be", "BVC"));
         collectDao.insertCpuStats(list);
     }
 
@@ -219,12 +279,15 @@ public class CollectServiceImpl implements CollectService {
         return collectDao.queryCpuStats();
     }
 
-    public static void main(String[] args) {
-        int a = 1;
-        int b = 2;
-        int c = 0;
-        c += a + b;
-        System.out.println(c);
+    @Override
+    public Map<String, String> fetchQueue() {
+        List<UserQueue> list = collectDao.fetchQueue();
+        Map<String, String> queueRtypeMap = new HashMap<>();
+        for (UserQueue q : list) {
+            queueRtypeMap.putIfAbsent(q.getQueueName().toLowerCase() + " " + q.getClusterName().toLowerCase() + " " +
+                    q.getPhysicalQueue().toLowerCase(), q.getResourceType());
+        }
+        return queueRtypeMap;
     }
 }
 
