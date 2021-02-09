@@ -50,7 +50,7 @@ public class CpuStats {
     public String getDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd");
         Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, 0);
+        calendar.add(Calendar.DATE, -1);
         Date date = calendar.getTime();
         return sdf.format(date);
     }
