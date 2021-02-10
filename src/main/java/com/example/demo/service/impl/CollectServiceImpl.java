@@ -90,7 +90,7 @@ public class CollectServiceImpl implements CollectService {
                     Response response = call.execute();
                     String res = Objects.requireNonNull(response.body()).string();
                     JSONArray obj = JSON.parseObject(res).getJSONArray("physicals");//queue obj list under a physical queue
-                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[1]);
+                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0]);
                     anykeyResourceMap.get("MPI").getCpuResourceMap().put("stable", stableQuota);
                     continue;
                 } else if (!platform.equals("STREAM")) {
@@ -175,10 +175,10 @@ public class CollectServiceImpl implements CollectService {
 
                                     tNormalCpu += cpu;
                                 } else {
-                                    log.error("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                                    log.error("EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, quota: {}", cluster, phy, o.getString("name"), cpu);
                                 }
                             } else {
-                                log.error("NOT EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                                log.error("NOT EMRGENERAL - cluster name: {}, physical queue: {}, logical queue: {}, quota: {}", cluster, phy, o.getString("name"), cpu);
                             }
                         } else if (isQianXun) {
                             if (o.getString("resource.priority").equals("UNSTABLE")) {
