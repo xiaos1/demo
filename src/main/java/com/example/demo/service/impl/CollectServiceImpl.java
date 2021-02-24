@@ -275,8 +275,8 @@ public class CollectServiceImpl implements CollectService {
     }
 
     @Override
-    public List<ReturningData> doGetData() {
-        return collectDao.queryCpuStats();
+    public List<ReturningData> doGetData(String date) {
+        return collectDao.queryCpuStats(date);
     }
 
     @Override

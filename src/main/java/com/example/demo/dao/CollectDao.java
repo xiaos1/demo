@@ -17,5 +17,5 @@ public interface CollectDao {
 
     void insertCpuStats(List<CpuStats> cpuStats);
 
-    List<ReturningData> queryCpuStats();
+    List<ReturningData> queryCpuStats(String date);
 }

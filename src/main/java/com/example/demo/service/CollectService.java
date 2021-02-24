@@ -2,7 +2,6 @@ package com.example.demo.service;
 
 import com.example.demo.bean.ResourceClassification;
 import com.example.demo.bean.ReturningData;
-import com.example.demo.entity.UserQueue;
 
 import java.io.IOException;
 import java.util.List;
@@ -15,7 +14,7 @@ public interface CollectService {
 
     Map<String, ResourceClassification> doCollectData() throws IOException;
 
-    List<ReturningData> doGetData();
+    List<ReturningData> doGetData(String date);
 
     Map<String, String> fetchQueue();
 

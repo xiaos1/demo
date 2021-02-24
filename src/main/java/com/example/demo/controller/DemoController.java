@@ -2,10 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.service.CollectService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -25,7 +22,15 @@ public class DemoController extends BaseCtrl {
     @RequestMapping(value = "/reload", method = RequestMethod.GET, produces = "application/json")
     public void reload(HttpServletResponse response) throws IOException {
         Map<String, Object> ret = new HashMap<>();
-        ret.put("cpu", collectService.doGetData());
+        ret.put("cpu", collectService.doGetData(null));
+        responseJson(response, 0, "success", ret);
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/{date}", method = RequestMethod.GET, produces = "application/json")
+    public void reloadByDate(HttpServletResponse response, @PathVariable("date") String date) throws IOException {
+        Map<String, Object> ret = new HashMap<>();
+        ret.put("cpu", collectService.doGetData(date));
         responseJson(response, 0, "success", ret);
     }
 }

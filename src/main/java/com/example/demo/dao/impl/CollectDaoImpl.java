@@ -11,9 +11,12 @@ import org.nutz.dao.Sqls;
 import org.nutz.dao.sql.Sql;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:41 AM
@@ -49,8 +52,16 @@ public class CollectDaoImpl implements CollectDao {
     }
 
     @Override
-    public List<ReturningData> queryCpuStats() {
-        Sql sql = Sqls.create("select cpu as total, resource_type, rid, platform, date from t_cpu_stats");
+    public List<ReturningData> queryCpuStats(String date) {
+        Sql sql;
+        if (StringUtils.isEmpty(date)) {
+            sql = Sqls.create("select cpu as total, resource_type, rid, platform, date from t_cpu_stats");
+        } else {
+            if (!selectDates().contains(date)) {
+                date = selectDate();
+            }
+            sql = Sqls.create("select cpu as total, resource_type, rid, platform, date from t_cpu_stats where date = '" + date + "'");
+        }
         sql.setCallback((connection, rs, sql1) -> {
             List<ReturningData> list1 = new ArrayList<>();
             while (null != rs && rs.next()) {
@@ -66,5 +77,19 @@ public class CollectDaoImpl implements CollectDao {
         });
         dao.execute(sql);
         return sql.getList(ReturningData.class);
+    }
+
+    private Set<String> selectDates() {
+        Sql sql = Sqls.create("select distinct date from t_cpu_stats");
+        sql.setCallback(Sqls.callback.strs());
+        dao.execute(sql);
+        return new HashSet<>(sql.getList(String.class));
+    }
+
+    private String selectDate() {
+        Sql sql = Sqls.create("select date from t_cpu_stats where id = (select max(id) from t_cpu_stats)");
+        sql.setCallback(Sqls.callback.str());
+        dao.execute(sql);
+        return sql.getString();
     }
 }
