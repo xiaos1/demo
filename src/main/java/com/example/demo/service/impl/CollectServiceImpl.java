@@ -61,6 +61,11 @@ public class CollectServiceImpl implements CollectService {
         mpiCpuResourceMap.put("be", 0d);
         mpiCpuResourceMap.put("stable", 0d);
         anykeyResourceMap.putIfAbsent("MPI", new ResourceClassification(mpiCpuResourceMap));
+        Map<String, Double> streamCpuResourceMap = new HashMap<>();
+        mpiCpuResourceMap.put("normal", 0d);
+        mpiCpuResourceMap.put("be", 0d);
+        mpiCpuResourceMap.put("stable", 0d);
+        anykeyResourceMap.putIfAbsent("STREAM", new ResourceClassification(streamCpuResourceMap));
         Map<String, String> map = fetchQueue();
         for (PhyResource r : resources) {
             String cluster = r.getClusterName();
@@ -93,15 +98,22 @@ public class CollectServiceImpl implements CollectService {
                     stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0]);
                     anykeyResourceMap.get("MPI").getCpuResourceMap().put("stable", stableQuota);
                     continue;
-                } else if (!platform.equals("STREAM")) {
-                    request = new Request.Builder()
-                            .get()
-                            .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
-                            .build();
-                } else {
+                } else if ("STREAM".equals(platform)) {
                     request = new Request.Builder()
                             .get()
                             .url("http://" + cluster + ".dmop.baidu.com:8025/filetree?action=cat&path=/" + phy + "-resource.json")
+                            .build();
+                    Call call = client.newCall(request);
+                    Response response = call.execute();
+                    String res = Objects.requireNonNull(response.body()).string();
+                    JSONArray obj = JSON.parseObject(res).getJSONArray("physicals");//queue obj list under a physical queue
+                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0]);
+                    anykeyResourceMap.get("STREAM").getCpuResourceMap().put("stable", stableQuota);
+                    continue;
+                } else {
+                    request = new Request.Builder()
+                            .get()
+                            .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
                             .build();
                 }
                 Call call = client.newCall(request);
@@ -117,6 +129,7 @@ public class CollectServiceImpl implements CollectService {
                     String queueName = o.getString("name");
                     queues.add(queueName);
                     double cpu = o.getDouble("CPU");
+                    //some configuration do not contain this property MPI
                     if (!o.containsKey("resource.priority") || !o.getString("resource.priority").equals("UNSTABLE")) {
                         o.put("resource.priority", defaultResourcePriority);
                     }
@@ -254,9 +267,9 @@ public class CollectServiceImpl implements CollectService {
         Double bvcStable = 0.0d;
         List<CpuStats> list = new ArrayList<>();
         Map<String, ResourceClassification> rcMap = doCollectData();
-        for (String s : rcMap.keySet()) {
+        for (String s : rcMap.keySet()) {//s : platform
             Map<String, Double> dMap = rcMap.get(s).getCpuResourceMap();
-            for (String ss : dMap.keySet()) {
+            for (String ss : dMap.keySet()) {// ss : resourceType
                 if (s.equals("STREAM") || s.equals("MPI") || s.equals("EMRBUFFER") || s.equals("TOTAL")) {
                     list.add(new CpuStats(dMap.get(ss), ss, s));
                 } else if (!s.equals("ADU") && !s.equals("EMR") && !s.equals("BVC") && !s.equals("COMPASS") && !s.equals("OTHER")) {
