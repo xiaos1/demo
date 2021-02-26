@@ -62,9 +62,9 @@ public class CollectServiceImpl implements CollectService {
         mpiCpuResourceMap.put("stable", 0d);
         anykeyResourceMap.putIfAbsent("MPI", new ResourceClassification(mpiCpuResourceMap));
         Map<String, Double> streamCpuResourceMap = new HashMap<>();
-        mpiCpuResourceMap.put("normal", 0d);
-        mpiCpuResourceMap.put("be", 0d);
-        mpiCpuResourceMap.put("stable", 0d);
+        streamCpuResourceMap.put("normal", 0d);
+        streamCpuResourceMap.put("be", 0d);
+        streamCpuResourceMap.put("stable", 0d);
         anykeyResourceMap.putIfAbsent("STREAM", new ResourceClassification(streamCpuResourceMap));
         Map<String, String> map = fetchQueue();
         for (PhyResource r : resources) {
@@ -101,7 +101,7 @@ public class CollectServiceImpl implements CollectService {
                 } else if ("STREAM".equals(platform)) {
                     request = new Request.Builder()
                             .get()
-                            .url("http://" + cluster + ".dmop.baidu.com:8025/filetree?action=cat&path=/" + phy + "-resource.json")
+                            .url("http://" + cluster + ".dmop.baidu.com:8025/tracker?action=physical&physical=" + phy)
                             .build();
                     Call call = client.newCall(request);
                     Response response = call.execute();
@@ -267,7 +267,7 @@ public class CollectServiceImpl implements CollectService {
         Double bvcStable = 0.0d;
         List<CpuStats> list = new ArrayList<>();
         Map<String, ResourceClassification> rcMap = doCollectData();
-        for (String s : rcMap.keySet()) {//s : platform
+        for (String s : rcMap.keySet()) { //s : platform
             Map<String, Double> dMap = rcMap.get(s).getCpuResourceMap();
             for (String ss : dMap.keySet()) {// ss : resourceType
                 if (s.equals("STREAM") || s.equals("MPI") || s.equals("EMRBUFFER") || s.equals("TOTAL")) {
