@@ -41,7 +41,7 @@ public class CollectServiceImpl implements CollectService {
         double ridBeCpu, ridNormalCpu, ridStableCpu;
         double tBeCpu = 0.0d, tNormalCpu = 0.0d, tStableCpu = 0.0d;
         double bufferBeCpu = 0.0d, bufferNormalCpu = 0.0d, bufferStableCpu = 0.0d;
-        double stableQuota = 0.0d;
+        double stableQuota;
         String defaultResourcePriority = "STABLE";
         String defaultResourceAccountId = "";
         List<PhyResource> resources = collectDao.fetchResource();
@@ -95,7 +95,10 @@ public class CollectServiceImpl implements CollectService {
                     Response response = call.execute();
                     String res = Objects.requireNonNull(response.body()).string();
                     JSONArray obj = JSON.parseObject(res).getJSONArray("physicals");//queue obj list under a physical queue
-                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0]);
+                    String quota = obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0];
+                    log.warn("MPI - cluster name: {}, physical queue: {}, be quota: {}", cluster, phy, quota);
+                    stableQuota = anykeyResourceMap.get("MPI").getCpuResourceMap().get("stable");
+                    stableQuota += Double.parseDouble(quota);
                     anykeyResourceMap.get("MPI").getCpuResourceMap().put("stable", stableQuota);
                     continue;
                 } else if ("STREAM".equals(platform)) {
@@ -107,7 +110,10 @@ public class CollectServiceImpl implements CollectService {
                     Response response = call.execute();
                     String res = Objects.requireNonNull(response.body()).string();
                     JSONArray obj = JSON.parseObject(res).getJSONArray("physicals");//queue obj list under a physical queue
-                    stableQuota += Double.parseDouble(obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0]);
+                    String quota = obj.getJSONObject(0).getString("totalCPUMemDisk").split("/")[0];
+                    log.warn("STREAM - cluster name: {}, physical queue: {}, be quota: {}", cluster, phy, quota);
+                    stableQuota = anykeyResourceMap.get("STREAM").getCpuResourceMap().get("stable");
+                    stableQuota += Double.parseDouble(quota);
                     anykeyResourceMap.get("STREAM").getCpuResourceMap().put("stable", stableQuota);
                     continue;
                 } else {
