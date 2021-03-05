@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -41,7 +42,8 @@ public class CollectServiceImpl implements CollectService {
         double stableQuota;
         String defaultResourcePriority = "STABLE";
         String defaultResourceAccountId = "";
-        List<PhyResource> resources = collectDao.fetchResource();
+        List<PhyResource> resources = getPhys();
+        List<PhyResource> MpiAndStreamResources = collectDao.fetchMpiStreamResource();
         Map<String, ResourceClassification> anykeyResourceMap = new HashMap<>();
         Map<String, Double> totalCpuResourceMap = new HashMap<>();
         totalCpuResourceMap.put("normal", 0d);
@@ -58,8 +60,8 @@ public class CollectServiceImpl implements CollectService {
         streamCpuResourceMap.put("be", 0d);
         streamCpuResourceMap.put("stable", 0d);
         anykeyResourceMap.putIfAbsent("STREAM", new ResourceClassification(streamCpuResourceMap));
-//        Map<String, String> map = fetchQueue();
-        for (PhyResource r : resources) {
+//  对MPI和STREAM集群处理
+        for (PhyResource r : MpiAndStreamResources) {
             String cluster = r.getClusterName();
             String phy = r.getPhysicalQueue();
             String platform = r.getPlatform();
@@ -70,7 +72,6 @@ public class CollectServiceImpl implements CollectService {
                 cpuResourceMap.put("stable", 0d);
                 anykeyResourceMap.putIfAbsent(platform, new ResourceClassification(cpuResourceMap));
             }
-            boolean isQianXun = false;
             Request request = null;
             try {
                 if ("MPI".equals(platform)) {
@@ -87,7 +88,6 @@ public class CollectServiceImpl implements CollectService {
                     stableQuota = anykeyResourceMap.get("MPI").getCpuResourceMap().get("stable");
                     stableQuota += Double.parseDouble(quota);
                     anykeyResourceMap.get("MPI").getCpuResourceMap().put("stable", stableQuota);
-                    continue;
                 } else if ("STREAM".equals(platform)) {
                     request = new Request.Builder()
                             .get()
@@ -102,16 +102,34 @@ public class CollectServiceImpl implements CollectService {
                     stableQuota = anykeyResourceMap.get("STREAM").getCpuResourceMap().get("stable");
                     stableQuota += Double.parseDouble(quota);
                     anykeyResourceMap.get("STREAM").getCpuResourceMap().put("stable", stableQuota);
-                    continue;
-                } else {
-                    request = new Request.Builder()
-                            .get()
-                            .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + phy + "-resource.json")
-                            .build();
                 }
+            } catch (Exception e) {
+                log.error("ops, the http request {} was wrong!", request == null ? null : request.url().toString());
+            }
+        }
+        // 对其他集群处理
+        for (PhyResource r : resources) {
+            String cluster = r.getClusterName();
+            String phy = r.getPhysicalQueue();
+            boolean isQianXun = false;
+            Request request = null;
+            try {
+                request = new Request.Builder()
+                        .get()
+                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/scheduler_" + phy + ".json")
+                        .build();
                 Call call = client.newCall(request);
                 Response response = call.execute();
                 String res = Objects.requireNonNull(response.body()).string();
+                JSONObject jsonObject = JSON.parseObject(res);//queue obj list under a physical queue
+                String conf = jsonObject.getString("ResourceTreePath").replace("./conf/", "");
+                request = new Request.Builder()
+                        .get()
+                        .url("http://" + cluster + "-normandy.dmop.baidu.com:8033/filetree?action=cat&path=/" + conf)
+                        .build();
+                call = client.newCall(request);
+                response = call.execute();
+                res = Objects.requireNonNull(response.body()).string();
                 JSONObject obj = JSON.parseObject(res);//queue obj list under a physical queue
                 List<String> queues = new ArrayList<>();
                 for (String key : obj.keySet()) {
@@ -224,6 +242,34 @@ public class CollectServiceImpl implements CollectService {
     @Override
     public List<ReturningData> doGetData(String date) {
         return collectDao.queryCpuStats(date);
+    }
+
+    private List<PhyResource> getPhys() {
+        List<PhyResource> list = new ArrayList<>();
+        try {
+            Request request = new Request.Builder()
+                    .get()
+                    .url("http://10.83.128.26:8055/wucaishi/cluster/phyMap")
+                    .build();
+            Call call = client.newCall(request);
+            Response response = call.execute();
+            String res = Objects.requireNonNull(response.body()).string();
+            JSONArray data = JSON.parseObject(res).getJSONArray("data");
+            JSONObject obj = data.getJSONObject(0);
+            for (String cluster : obj.keySet()) {
+                JSONArray clusterName = obj.getJSONArray(cluster);
+                for (Object phyName : clusterName) {
+                    PhyResource phyResource = new PhyResource();
+                    phyResource.setClusterName(cluster);
+                    phyResource.setPhysicalQueue(String.valueOf(phyName));
+                    phyResource.setPlatform("");
+                    list.add(phyResource);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }
 

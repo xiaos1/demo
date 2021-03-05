@@ -4,7 +4,6 @@ import com.example.demo.bean.ReturningData;
 import com.example.demo.dao.CollectDao;
 import com.example.demo.entity.CpuStats;
 import com.example.demo.entity.PhyResource;
-import com.example.demo.entity.UserQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.nutz.dao.Dao;
 import org.nutz.dao.Sqls;
@@ -29,21 +28,13 @@ public class CollectDaoImpl implements CollectDao {
     Dao dao;
 
     @Override
-    public List<PhyResource> fetchResource() {
-        Sql sql = Sqls.create("select distinct cluster_name, physical_queue, platform, is_qianxun  from t_global_cluster_quota_resource");
+    public List<PhyResource> fetchMpiStreamResource() {
+        Sql sql = Sqls.create("select distinct cluster_name, physical_queue, platform, is_qianxun  " +
+                "from t_global_cluster_quota_resource where platform = 'MPI' or platform = 'STREAM'");
         sql.setCallback(Sqls.callback.entities());
         sql.setEntity(dao.getEntity(PhyResource.class));
         dao.execute(sql);
         return sql.getList(PhyResource.class);
-    }
-
-    @Override
-    public List<UserQueue> fetchQueue() {
-        Sql sql = Sqls.create("select queue_name, cluster_name, resource_type, physical_queue from t_user_queue");
-        sql.setCallback(Sqls.callback.entities());
-        sql.setEntity(dao.getEntity(UserQueue.class));
-        dao.execute(sql);
-        return sql.getList(UserQueue.class);
     }
 
     @Override
