@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: prod
   jackson:
     serialization:
       write-dates-as-timestamps: true

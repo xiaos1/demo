@@ -19,8 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author by songxiao02 <songxiao02@baidu.com> on 2021/1/29 11:40 AM
@@ -33,14 +33,16 @@ public class CollectServiceImpl implements CollectService {
     @Autowired
     CollectDao collectDao;
 
-    OkHttpClient client = new OkHttpClient();
+    OkHttpClient client = new OkHttpClient().newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build();
 
     @Override
     public Map<String, ResourceClassification> doCollectData() {
         double ridBeCpu, ridNormalCpu, ridStableCpu;
         double tBeCpu = 0.0d, tNormalCpu = 0.0d, tStableCpu = 0.0d; // total
         double stableQuota;
-        String defaultResourcePriority = "STABLE";
         String defaultResourceAccountId = "";
         List<PhyResource> resources = getPhys();
         List<PhyResource> MpiAndStreamResources = collectDao.fetchMpiStreamResource();
@@ -155,10 +157,7 @@ public class CollectServiceImpl implements CollectService {
                     String queueName = o.getString("name");
                     queues.add(queueName);
                     double cpu = o.getDouble("CPU");
-                    //some configuration do not contain this property MPI
-                    if (!o.containsKey("resource.priority") || !o.getString("resource.priority").equals("UNSTABLE")) {
-                        o.put("resource.priority", defaultResourcePriority);
-                    }
+                    double mem = o.getDouble("MEMORY");
                     if (!o.containsKey("resource.account.id")) {
                         o.put("resource.account.id", defaultResourceAccountId);
                     }
@@ -173,17 +172,20 @@ public class CollectServiceImpl implements CollectService {
                     if (!StringUtils.isEmpty(rid)) {
                         log.info("resource.account.id: {}", rid);
                     }
+                    if ( !o.getString("resource.priority").equals("UNSTABLE") && !o.getString("resource.priority").equals("STABLE")){
+                        log.info("GENERAL - rid: {}, cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}, mem: {}, ", rid, cluster, phy, o.getString("name"), cpu, mem);
+                    }
                     if (isQianXun) {
                         if (o.getString("resource.priority").equals("UNSTABLE")) {
                             ridNormalCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("normal") + cpu;
                             anykeyResourceMap.get(rid).getCpuResourceMap().put("normal", ridNormalCpu);
-                            log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}", cluster, phy, o.getString("name"), cpu);
+                            log.info("GENERAL - rid: {}, cluster name: {}, physical queue: {}, logical queue: {}, normal quota: {}, mem: {}, priority: {}", rid, cluster, phy, o.getString("name"), cpu, mem, o.getString("resource.priority"));
 
                             tNormalCpu += cpu;
                         } else if (o.getString("resource.priority").equals("STABLE")) {
                             ridBeCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("be") + cpu;
                             anykeyResourceMap.get(rid).getCpuResourceMap().put("be", ridBeCpu);
-                            log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+                            log.info("GENERAL - rid: {}, cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}, mem: {}, priority: {}", rid, cluster, phy, o.getString("name"), cpu, mem, o.getString("resource.priority"));
 
                             tBeCpu += cpu;
                         }
@@ -191,13 +193,13 @@ public class CollectServiceImpl implements CollectService {
                         if (o.getString("resource.priority").equals("UNSTABLE")) {
                             ridBeCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("be") + cpu;
                             anykeyResourceMap.get(rid).getCpuResourceMap().put("be", ridBeCpu);
-                            log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}", cluster, phy, o.getString("name"), cpu);
+                            log.info("GENERAL - rid: {}, cluster name: {}, physical queue: {}, logical queue: {}, be quota: {}, mem: {}, priority: {}", rid, cluster, phy, o.getString("name"), cpu, mem, o.getString("resource.priority"));
 
                             tBeCpu += cpu;
                         } else if (o.getString("resource.priority").equals("STABLE")) {
                             ridStableCpu = anykeyResourceMap.get(rid).getCpuResourceMap().get("stable") + cpu;
                             anykeyResourceMap.get(rid).getCpuResourceMap().put("stable", ridStableCpu);
-                            log.info("GENERAL - cluster name: {}, physical queue: {}, logical queue: {}, stable quota: {}", cluster, phy, o.getString("name"), cpu);
+                            log.info("GENERAL - rid: {}, cluster name: {}, physical queue: {}, logical queue: {}, stable quota: {}, mem: {}, priority: {}", rid, cluster, phy, o.getString("name"), cpu, mem, o.getString("resource.priority"));
 
                             tStableCpu += cpu;
                         }

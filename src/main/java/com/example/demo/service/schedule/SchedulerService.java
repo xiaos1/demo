@@ -21,7 +21,7 @@ public class SchedulerService {
     @Autowired
     CollectService collectService;
 
-    @Scheduled(zone = "Asia/Shanghai", cron = "0 40 3 * * ?")
+    @Scheduled(zone = "Asia/Shanghai", cron = "0 0 1 * * ?")
 //    @Scheduled(zone = "Asia/Shanghai",cron = "* */20 * * * ?")
 //    @PostConstruct
     public void doStats() {
