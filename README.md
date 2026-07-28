@@ -20,6 +20,12 @@ mvn spring-boot:run
 
 The app starts on `http://localhost:8335`.
 
+## Web dashboard
+
+Open `http://localhost:8335/` in a browser for a visual dashboard of the ranked ideas and
+freelance suggestions (static HTML/CSS/JS in `src/main/resources/static`, calling the REST API
+below via `fetch`). Use the "Refresh data" button to re-run the crawl on demand.
+
 ## Endpoints
 
 | Method | Path                        | Description                                                        |
