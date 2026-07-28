@@ -1,10 +1,10 @@
 spring:
-    application:
-        name: ai-beginner-programs
+  application:
+    name: ai-beginner-programs
 
 server:
-    port: 8335
+  port: 8335
 
 logging:
-    level:
-        com.example.aitrends: INFO
+  level:
+    com.example.aitrends: INFO
