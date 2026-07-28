@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: ai-beginner-programs
+
+server:
+  port: 8335
+
+logging:
+  level:
+    com.example.aitrends: INFO
