@@ -23,10 +23,6 @@ public class FreelanceSuggestion {
         return ideaName;
     }
 
-    public List<String> getPlatforms() {
-        return platforms;
-    }
-
     public String getPricingRange() {
         return pricingRange;
     }

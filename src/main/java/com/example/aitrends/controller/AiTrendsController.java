@@ -27,20 +27,26 @@ public class AiTrendsController {
         this.freelanceAdvisorService = freelanceAdvisorService;
     }
 
-    /** Feature 1: crawl public internet sources for signal about hot AI-beginner programs. */
+    /**
+     * Feature 1: crawl public internet sources for signal about hot AI-beginner programs.
+     */
     @GetMapping("/api/crawl")
     public List<CrawledItem> crawl() {
         return crawlerService.crawlAll();
     }
 
-    /** Feature 2: print + return the most popular AI program ideas for beginners. */
+    /**
+     * Feature 2: print + return the most popular AI program ideas for beginners.
+     */
     @GetMapping("/api/ideas/popular")
     public List<ProgramIdea> popularIdeas(@RequestParam(defaultValue = "10") int limit) {
         List<CrawledItem> items = crawlerService.crawlAll();
         return ideaAnalyzerService.rankIdeas(items, limit);
     }
 
-    /** Feature 3: freelancer suggestions built from the current top ideas. */
+    /**
+     * Feature 3: freelancer suggestions built from the current top ideas.
+     */
     @GetMapping("/api/freelance/suggestions")
     public FreelanceReport freelanceSuggestions(@RequestParam(defaultValue = "5") int limit) {
         List<CrawledItem> items = crawlerService.crawlAll();
@@ -48,10 +54,12 @@ public class AiTrendsController {
         return freelanceAdvisorService.buildReport(topIdeas);
     }
 
-    /** Combined view: crawl -> rank ideas -> freelance suggestions, in one call. */
+    /**
+     * Combined view: crawl -> rank ideas -> freelance suggestions, in one call.
+     */
     @GetMapping("/api/report")
     public FullReport fullReport(@RequestParam(defaultValue = "10") int ideaLimit,
-                                  @RequestParam(defaultValue = "5") int freelanceLimit) {
+                                 @RequestParam(defaultValue = "5") int freelanceLimit) {
         List<CrawledItem> items = crawlerService.crawlAll();
         List<ProgramIdea> topIdeas = ideaAnalyzerService.rankIdeas(items, ideaLimit);
         FreelanceReport freelanceReport = freelanceAdvisorService.buildReport(
