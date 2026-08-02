@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELIZA</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/eliza.css">
+</head>
+<body>
+<header>
+  <h1>ELIZA</h1>
+  <p class="subtitle">A re-implementation of Joseph Weizenbaum's 1966 chatbot. <a href="/">&larr; Back to dashboard</a></p>
+</header>
+
+<main>
+  <section class="card" id="chat-card">
+    <div id="log" aria-live="polite"></div>
+    <form id="chat-form">
+      <input id="messageInput" type="text" autocomplete="off" placeholder="Type a message..." autofocus>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+</main>
+
+<script src="js/eliza.js"></script>
+</body>
+</html>
